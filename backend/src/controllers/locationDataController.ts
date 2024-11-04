@@ -4,7 +4,15 @@ import pool from '../db'
 // Controller function to get location data based on query parameters
 export const getLocationData = async (req: Request, res: Response) => {
   // Destructure query parameters, setting default values for limit and offset
-  const { county_code, place_code, highway_district, latitude, longitude, limit = 100, offset = 0 } = req.query
+  const { 
+    county_code, 
+    place_code, 
+    highway_district, 
+    latitude, 
+    longitude, 
+    limit = 1000, 
+    offset = 0 
+  } = req.query
 
   // Initialize the base SQL query
   let query = 'SELECT * FROM location_data WHERE 1=1'

@@ -1,94 +1,153 @@
 import React, { useEffect, useState } from 'react'
-import Map, { Marker } from 'react-map-gl' // Import Map and Marker components from react-map-gl
-import 'mapbox-gl/dist/mapbox-gl.css' // Import Mapbox CSS for styling
+import Map, { Source, Layer, Marker, Popup } from 'react-map-gl'
+import 'mapbox-gl/dist/mapbox-gl.css'
 
-// Mapbox access token from environment variables
 const MAPBOX_TOKEN = process.env.REACT_APP_MAPBOX_ACCESS_TOKEN
 
-// Interface for bridge location data
 interface Bridge {
   bridge_id: number
   latitude: number
   longitude: number
+  deck_condition?: number // Add more properties as needed for bridge details
 }
 
 const MapComponent: React.FC = () => {
-  const [bridgeLocations, setBridgeLocations] = useState<Bridge[]>([]) // State to store fetched bridge locations
+  const [bridgeGeoJSON, setBridgeGeoJSON] = useState<any>(null)
+  const [selectedBridge, setSelectedBridge] = useState<Bridge | null>(null)
 
   useEffect(() => {
-    // Fetch bridge location data from the backend API
     const fetchBridgeLocations = async () => {
       try {
-        const response = await fetch('/api/location-data') // API endpoint for bridge location data
+        const response = await fetch('/api/location-data')
         const data = await response.json()
 
-        // Scale and filter location data to match the map’s coordinate system
-        const scaledData = data
-          .map((bridge: any) => ({
-            bridge_id: bridge.bridge_id,
-            latitude: parseFloat(bridge.latitude) / 1000000,
-            longitude: -Math.abs(parseFloat(bridge.longitude) / 1000000),
-          }))
-          .filter(
-            (bridge: Bridge) =>
-              !isNaN(bridge.latitude) &&
-              !isNaN(bridge.longitude) &&
-              bridge.latitude >= -90 &&
-              bridge.latitude <= 90 &&
-              bridge.longitude >= -180 &&
-              bridge.longitude <= 0 // Ensure longitudes are within the Western Hemisphere
-          )
+        // Convert data to GeoJSON format for clustering
+        const geoJSON = {
+          type: 'FeatureCollection',
+          features: data.map((bridge: any) => ({
+            type: 'Feature',
+            properties: {
+              bridge_id: bridge.bridge_id,
+              deck_condition: bridge.deck_condition || 'Unknown' // Modify as needed
+            },
+            geometry: {
+              type: 'Point',
+              coordinates: [
+                -Math.abs(parseFloat(bridge.longitude) / 1000000),
+                parseFloat(bridge.latitude) / 1000000,
+              ],
+            },
+          })),
+        }
 
-        setBridgeLocations(scaledData) // Update state with processed bridge locations
+        setBridgeGeoJSON(geoJSON)
       } catch (error) {
-        console.error('Error fetching bridge locations:', error) // Log any fetch errors
+        console.error('Error fetching bridge locations:', error)
       }
     }
 
-    fetchBridgeLocations() // Invoke data fetch on component mount
+    fetchBridgeLocations()
   }, [])
 
   return (
     <Map
       initialViewState={{
-        longitude: -76.8867, // Initial map center (Pennsylvania)
+        longitude: -76.8867,
         latitude: 40.2732,
         zoom: 7,
       }}
-      style={{ width: '100%', height: '100vh' }} // Set map size
-      mapStyle="mapbox://styles/mapbox/streets-v11" // Mapbox style
-      mapboxAccessToken={MAPBOX_TOKEN} // Pass in Mapbox access token
+      style={{ width: '100%', height: '100vh' }}
+      mapStyle="mapbox://styles/mapbox/streets-v11"
+      mapboxAccessToken={MAPBOX_TOKEN}
     >
-      {bridgeLocations.map((bridge) => (
-        // Marker for each bridge location
-        <Marker
-          key={bridge.bridge_id}
-          longitude={bridge.longitude}
-          latitude={bridge.latitude}
-          anchor="bottom"
+      {/* Source for clustering */}
+      {bridgeGeoJSON && (
+        <Source
+          id="bridges"
+          type="geojson"
+          data={bridgeGeoJSON}
+          cluster={true}
+          clusterMaxZoom={14} // Maximum zoom level to cluster points
+          clusterRadius={50} // Radius of each cluster in pixels
         >
-          <div
-            style={{
-              width: '10px',
-              height: '10px',
-              backgroundColor: 'red',
-              borderRadius: '50%', // Circular red marker for bridges
+          {/* Clustered Circle Layer */}
+          <Layer
+            id="clusters"
+            type="circle"
+            filter={['has', 'point_count']}
+            paint={{
+              'circle-color': [
+                'step',
+                ['get', 'point_count'],
+                '#51bbd6',
+                100,
+                '#f1f075',
+                750,
+                '#f28cb1',
+              ],
+              'circle-radius': [
+                'step',
+                ['get', 'point_count'],
+                20,
+                100,
+                30,
+                750,
+                40,
+              ],
             }}
           />
-        </Marker>
-      ))}
 
-      {/* Blue dot to indicate the map center */}
+          {/* Cluster Count Layer */}
+          <Layer
+            id="cluster-count"
+            type="symbol"
+            filter={['has', 'point_count']}
+            layout={{
+              'text-field': '{point_count_abbreviated}',
+              'text-size': 12,
+            }}
+          />
+
+          {/* Unclustered Points */}
+          <Layer
+            id="unclustered-point"
+            type="circle"
+            filter={['!', ['has', 'point_count']]}
+            paint={{
+              'circle-color': '#11b4da',
+              'circle-radius': 6,
+              'circle-stroke-width': 1,
+              'circle-stroke-color': '#fff',
+            }}
+          />
+        </Source>
+      )}
+
+      {/* Debug marker at the center */}
       <Marker latitude={40.2732} longitude={-76.8867} anchor="bottom">
         <div
           style={{
             width: '10px',
             height: '10px',
             backgroundColor: 'blue',
-            borderRadius: '50%', // Circular blue marker for map center
+            borderRadius: '50%',
           }}
         />
       </Marker>
+
+      {/* Popup for Selected Bridge */}
+      {selectedBridge && (
+        <Popup
+          latitude={selectedBridge.latitude}
+          longitude={selectedBridge.longitude}
+          onClose={() => setSelectedBridge(null)}
+        >
+          <div>
+            <h3>Bridge ID: {selectedBridge.bridge_id}</h3>
+            <p>Condition: {selectedBridge.deck_condition || 'Unknown'}</p>
+          </div>
+        </Popup>
+      )}
     </Map>
   )
 }
