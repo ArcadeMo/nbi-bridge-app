@@ -11,7 +11,7 @@ export const getBridges = async (req: Request, res: Response) => {
     structure_number, 
     record_type, 
     route_prefix, 
-    limit = 10, 
+    limit = 1000, 
     offset = 0 
   } = req.query;
 

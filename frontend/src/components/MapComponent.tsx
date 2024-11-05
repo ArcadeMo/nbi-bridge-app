@@ -8,17 +8,21 @@ interface Bridge {
   bridge_id: number;
   latitude: number;
   longitude: number;
+  structure_length_mt?: number;
+  roadway_width_mt?: number;
+  superstructure_cond?: number;
+  substructure_cond?: number;
 }
 
 const MapComponent: React.FC = () => {
   const [bridgeLocations, setBridgeLocations] = useState<Bridge[]>([]);
   const [hoveredBridge, setHoveredBridge] = useState<Bridge | null>(null);
-  const [showClusters, setShowClusters] = useState(true); // State to manage cluster visibility
+  const [showClusters, setShowClusters] = useState(true);
 
   useEffect(() => {
-    const fetchBridgeLocations = async () => {
+    const fetchBridgeDetails = async () => {
       try {
-        const response = await fetch('/api/location-data');
+        const response = await fetch('/api/bridge-details');
         const data = await response.json();
 
         const scaledData = data
@@ -26,25 +30,36 @@ const MapComponent: React.FC = () => {
             bridge_id: bridge.bridge_id,
             latitude: parseFloat(bridge.latitude) / 1000000,
             longitude: -Math.abs(parseFloat(bridge.longitude) / 1000000),
+            structure_length_mt: bridge.structure_length_mt,
+            roadway_width_mt: bridge.roadway_width_mt,
+            superstructure_cond: bridge.superstructure_cond,
+            substructure_cond: bridge.substructure_cond,
           }))
-          .filter(
-            (bridge: Bridge) =>
-              !isNaN(bridge.latitude) &&
-              !isNaN(bridge.longitude) &&
-              bridge.latitude >= -90 &&
-              bridge.latitude <= 90 &&
-              bridge.longitude >= -180 &&
-              bridge.longitude <= 0
-          );
+          .filter((bridge: Bridge) => !isNaN(bridge.latitude) && !isNaN(bridge.longitude));
 
         setBridgeLocations(scaledData);
       } catch (error) {
-        console.error('Error fetching bridge locations:', error);
+        console.error('Error fetching bridge details:', error);
       }
     };
 
-    fetchBridgeLocations();
+    fetchBridgeDetails();
   }, []);
+
+  // Convert bridge data to GeoJSON format for clustering
+  const bridgeLocationsGeoJSON = {
+    type: 'FeatureCollection',
+    features: bridgeLocations.map((bridge) => ({
+      type: 'Feature',
+      geometry: {
+        type: 'Point',
+        coordinates: [bridge.longitude, bridge.latitude],
+      },
+      properties: {
+        bridge_id: bridge.bridge_id,
+      },
+    })),
+  };
 
   return (
     <div style={{ position: 'relative' }}>
@@ -68,29 +83,16 @@ const MapComponent: React.FC = () => {
         mapStyle="mapbox://styles/mapbox/streets-v11"
         mapboxAccessToken={MAPBOX_TOKEN}
       >
-        {/* Cluster Source - only visible if showClusters is true */}
+        {/* Conditionally render the cluster layers */}
         {showClusters && (
           <Source
             id="bridges"
             type="geojson"
-            data={{
-              type: 'FeatureCollection',
-              features: bridgeLocations.map((bridge) => ({
-                type: 'Feature',
-                geometry: {
-                  type: 'Point',
-                  coordinates: [bridge.longitude, bridge.latitude],
-                },
-                properties: {
-                  bridge_id: bridge.bridge_id,
-                },
-              })),
-            }}
+            data={bridgeLocationsGeoJSON}
             cluster={true}
             clusterMaxZoom={10}
             clusterRadius={50}
           >
-            {/* Cluster circles */}
             <Layer
               id="clusters"
               type="circle"
@@ -101,16 +103,13 @@ const MapComponent: React.FC = () => {
                   'step',
                   ['get', 'point_count'],
                   15,
-                  10,
-                  20,
-                  50,
-                  30,
+                  10, 20,
+                  50, 30,
                 ],
                 'circle-stroke-width': 2,
                 'circle-stroke-color': '#FFFFFF',
               }}
             />
-            {/* Cluster count label */}
             <Layer
               id="cluster-count"
               type="symbol"
@@ -124,7 +123,6 @@ const MapComponent: React.FC = () => {
                 'text-color': '#FFFFFF',
               }}
             />
-            {/* Unclustered individual points */}
             <Layer
               id="unclustered-point"
               type="circle"
@@ -139,7 +137,7 @@ const MapComponent: React.FC = () => {
           </Source>
         )}
 
-        {/* Individual bridge markers - only visible if showClusters is false */}
+        {/* Individual markers for bridges when clustering is off */}
         {!showClusters &&
           bridgeLocations.map((bridge) => (
             <Marker
@@ -161,7 +159,7 @@ const MapComponent: React.FC = () => {
             </Marker>
           ))}
 
-        {/* Hovered Bridge Popup */}
+        {/* Popup for displaying bridge details on hover */}
         {hoveredBridge && (
           <Popup
             longitude={hoveredBridge.longitude}
@@ -172,8 +170,10 @@ const MapComponent: React.FC = () => {
           >
             <div>
               <h4>Bridge Details</h4>
-              <p>ID: {hoveredBridge.bridge_id}</p>
-              {/* Add more bridge details here */}
+              <p>Structure Length (m): {hoveredBridge.structure_length_mt}</p>
+              <p>Roadway Width (m): {hoveredBridge.roadway_width_mt}</p>
+              <p>Superstructure Condition: {hoveredBridge.superstructure_cond}</p>
+              <p>Substructure Condition: {hoveredBridge.substructure_cond}</p>
             </div>
           </Popup>
         )}

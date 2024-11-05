@@ -10,7 +10,7 @@ export const getStructureDetails = async (req: Request, res: Response) => {
     max_span_len_mt,
     roadway_width_mt,
     deck_width_mt,
-    limit = 10,
+    limit = 1000,
     offset = 0,
   } = req.query
 

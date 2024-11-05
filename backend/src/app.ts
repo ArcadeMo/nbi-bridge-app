@@ -6,7 +6,7 @@ import locationDataRoutes from './routes/locationData';
 import structureDetailsRoutes from './routes/structureDetails';
 import conditionRatingsRoutes from './routes/conditionRatings';
 import inspectionDataRoutes from './routes/inspectionData';
-import testRoutes from './routes/testRoutes';  // Import the test routes
+import bridgeDetailsRoutes from './routes/bridgeDetails'; 
 
 dotenv.config();
 
@@ -22,7 +22,7 @@ app.use('/api/location-data', locationDataRoutes);
 app.use('/api/structure-details', structureDetailsRoutes);
 app.use('/api/condition-ratings', conditionRatingsRoutes);
 app.use('/api/inspection-data', inspectionDataRoutes);
-app.use('/api/test', testRoutes);  // Register the test routes under a separate path
+app.use('/api/bridge-details', bridgeDetailsRoutes); 
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);

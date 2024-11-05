@@ -10,7 +10,7 @@ export const getConditionRatings = async (req: Request, res: Response) => {
     substructure_cond,
     channel_cond,
     culvert_cond,
-    limit = 10,
+    limit = 1000,
     offset = 0,
   } = req.query;
 

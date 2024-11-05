@@ -10,7 +10,7 @@ export const getInspectionData = async (req: Request, res: Response) => {
     fracture_critical,
     underwater_inspect,
     special_inspect,
-    limit = 10,
+    limit = 1000,
     offset = 0,
   } = req.query
 
